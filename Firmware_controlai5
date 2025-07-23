@@ -1,0 +1,121 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h> // Instalar: ArduinoJson by Benoit Blanchon
+#include <EEPROM.h>      // Para guardar credenciales WiFi
+
+// --- Definiciones de Pines ESP32 ---
+// LED de conexión (PIN 2)
+#define STATUS_LED_PIN 2
+
+// Entradas Digitales
+#define DIGITAL_IN1_PIN 19
+#define DIGITAL_IN2_PIN 18
+#define DIGITAL_IN3_PIN 5
+#define DIGITAL_IN4_PIN 17
+#define DIGITAL_IN5_PIN 16
+#define DIGITAL_IN6_PIN 4
+const int digitalInputPins[] = {DIGITAL_IN1_PIN, DIGITAL_IN2_PIN, DIGITAL_IN3_PIN, DIGITAL_IN4_PIN, DIGITAL_IN5_PIN, DIGITAL_IN6_PIN};
+const int NUM_DIGITAL_INPUTS = sizeof(digitalInputPins) / sizeof(digitalInputPins[0]);
+int lastDigitalState[NUM_DIGITAL_INPUTS]; // Para almacenar el último estado leído
+unsigned long lastDigitalChangeTime[NUM_DIGITAL_INPUTS]; // Para debounce
+
+// Entradas Analógicas
+#define ANALOG_IN1_PIN 34
+#define ANALOG_IN2_PIN 35
+const int analogInputPins[] = {ANALOG_IN1_PIN, ANALOG_IN2_PIN};
+const int NUM_ANALOG_INPUTS = sizeof(analogInputPins) / sizeof(analogInputPins[0]);
+float lastAnalogValue[NUM_ANALOG_INPUTS]; // Para almacenar el último valor leído
+
+// Salidas
+#define OUTPUT1_PIN 15
+#define OUTPUT2_PIN 21
+const int outputPins[] = {OUTPUT1_PIN, OUTPUT2_PIN};
+const int NUM_OUTPUTS = sizeof(outputPins) / sizeof(outputPins[0]);
+int currentOutputState[NUM_OUTPUTS]; // Para almacenar el estado actual de la salida
+String outputMode[NUM_OUTPUTS]; // "Llave" o "Pulsador", cargado desde el backend
+
+// Pin para activar el modo Access Point (AP)
+#define AP_TRIGGER_PIN 26 // Mantener en HIGH por >15s para activar AP
+
+// --- Configuración de Red y Backend ---
+// ¡IMPORTANTE! Reemplaza 'tudominio.com' con el dominio real de tu hosting.
+const char* API_HOST = "tudominio.com"; // Dominio de tu backend PHP
+const char* FRONTEND_URL_AP = "http://tudominio.com/frontend"; // URL de tu frontend para el modo AP
+
+const char* SEND_DATA_URL = "/backend/api/data/send_data.php";
+const char* KEEPALIVE_URL = "/backend/api/data/keepalive.php";
+const char* GET_STATE_URL = "/backend/api/data/get_state.php"; // Usado para obtener comandos de salida
+
+// Tiempos para Keepalive, Lectura de Analógicas y Debounce
+const long KEEPALIVE_INTERVAL = 4 * 60 * 1000; // 4 minutos
+const long ANALOG_READ_INTERVAL = 5 * 60 * 1000; // 5 minutos
+const long DIGITAL_DEBOUNCE_DELAY = 2000; // 2 segundos
+const long OUTPUT_COMMAND_CHECK_INTERVAL = 5000; // Chequear comandos de salida cada 5 segundos
+
+unsigned long lastKeepaliveTime = 0;
+unsigned long lastAnalogReadTime = 0;
+unsigned long lastOutputCheckTime = 0;
+
+// --- Modo AP (Access Point) ---
+#define AP_SSID_PREFIX "ESP32_" // Prefijo para el SSID del AP (ej. ESP32_12345678_setup)
+#define AP_PASSWORD "control0*" // Contraseña del AP
+IPAddress apIP(192, 168, 6, 1);
+IPAddress apGateway(192, 168, 6, 1);
+IPAddress apSubnet(255, 255, 255, 0);
+
+WebServer server(80);
+bool apModeActive = false; // Bandera para indicar si el modo AP está activo
+
+// --- Chip ID del ESP32 ---
+uint64_t chipId;
+char chipIdStr[20]; // Para almacenar el Chip ID como string hexadecimal
+
+// --- EEPROM para Credenciales WiFi ---
+struct WifiCredentials {
+    char ssid1[32];
+    char password1[64];
+    char ssid2[32];
+    char password2[64];
+    bool configured; // Para saber si ya se han guardado credenciales
+};
+WifiCredentials wifiCreds;
+
+#define EEPROM_SIZE sizeof(WifiCredentials)
+#define EEPROM_CREDENTIALS_ADDR 0
+
+/**
+ * @brief Guarda las credenciales WiFi en la EEPROM.
+ */
+void saveCredentials() {
+    EEPROM.put(EEPROM_CREDENTIALS_ADDR, wifiCreds);
+    EEPROM.commit();
+    Serial.println("Credenciales guardadas en EEPROM.");
+}
+
+/**
+ * @brief Carga las credenciales WiFi desde la EEPROM.
+ */
+void loadCredentials() {
+    EEPROM.get(EEPROM_CREDENTIALS_ADDR, wifiCreds);
+    if (!wifiCreds.configured) {
+        Serial.println("No se encontraron credenciales WiFi guardadas.");
+        // Limpiar para asegurar un inicio limpio si los datos están corruptos
+        memset(&wifiCreds, 0, sizeof(WifiCredentials));
+        wifiCreds.configured = false;
+    } else {
+        Serial.println("Credenciales WiFi cargadas.");
+        Serial.print("SSID1: "); Serial.println(wifiCreds.ssid1);
+    }
+}
+
+/**
+ * @brief Intenta conectar el ESP32 a una red WiFi.
+ * @param ssid El SSID de la red WiFi.
+ * @param password La contraseña de la red WiFi.
+ */
+void connectToWiFi(const char* ssid, const char* password) {
+    if (strlen(ssid) == 0) {
+        Serial.println("SSID vacío, no se puede conectar.");
+        return;
+  
