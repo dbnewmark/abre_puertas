@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abre Puertas - Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1>🚪 Abre Puertas</h1>
+            <div class="nav-right">
+                <span id="userName"></span>
+                <button id="logoutBtn" class="btn btn-secondary">Cerrar Sesión</button>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="dashboard">
+            <div class="section">
+                <h2>Registrar Nuevo Dispositivo</h2>
+                <form id="registerDeviceForm" class="inline-form">
+                    <input type="text" id="chipId" placeholder="Chip ID del ESP32" required>
+                    <input type="text" id="alias" placeholder="Nombre del dispositivo (opcional)">
+                    <button type="submit" class="btn btn-primary">Registrar</button>
+                </form>
+                <div id="register-message" style="display: none; margin-top: 10px;"></div>
+            </div>
+            
+            <div class="section">
+                <h2>Mis Dispositivos</h2>
+                <div id="devicesList" class="devices-grid">
+                    <p class="loading">Cargando dispositivos...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
