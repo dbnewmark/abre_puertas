@@ -167,4 +167,9 @@ async function controlRelay(deviceId, action) {
 loadDevices();
 
 // Auto-refresh cada 10 segundos
-setInterval(loadDevices, 10000);
+const refreshInterval = setInterval(loadDevices, 10000);
+
+// Limpiar el intervalo cuando se cierra la página
+window.addEventListener('beforeunload', () => {
+    clearInterval(refreshInterval);
+});

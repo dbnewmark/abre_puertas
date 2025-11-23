@@ -34,7 +34,7 @@ class Auth {
         }
 
         // Hash de la contraseña
-        $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
         // Insertar usuario
         try {

@@ -2,16 +2,19 @@
 #include <HTTPClient.h>
 
 // --- Configuración WiFi ---
+// IMPORTANTE: Cambiar estas credenciales antes de cargar el firmware
 const char* ssid = "TU_SSID_WIFI";
 const char* password = "TU_PASSWORD_WIFI";
 
 // --- Configuración del servidor ---
+// IMPORTANTE: Cambiar a tu dominio. En producción usar HTTPS para mayor seguridad
+// Ejemplo HTTPS: const char* serverUrl = "https://tudominio.com/backend/api/device_status.php";
 const char* serverUrl = "http://tudominio.com/backend/api/device_status.php";
 const char* reportUrl = "http://tudominio.com/backend/api/report_status.php";
 
 // --- Pines del ESP32 ---
 #define RELAY_PIN 2        // Pin GPIO para controlar el relé
-#define LED_PIN 2          // LED integrado (mismo pin que relé en este ejemplo)
+#define LED_PIN 2          // LED integrado (mismo pin que relé - cambiarlo si se usa un pin diferente)
 #define SETUP_BUTTON_PIN 0 // Pin del botón de setup (GPIO 0 - BOOT button)
 
 // --- Variables globales ---
