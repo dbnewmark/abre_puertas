@@ -8,8 +8,8 @@ package-lock.json
 vendor/
 composer.lock
 
-# Database credentials
-/backend/config/database.php
+# Database credentials - NEVER commit this file
+backend/config/database.php
 
 # Environment files
 .env
